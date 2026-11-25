@@ -81,5 +81,7 @@ curl http://localhost:8080/exports/grades.csv
 
 - A submission contains code, a link to a GitHub repository, or both.
 - A student can only submit once per exercise.
-- A submission sent after the deadline day is marked as late.
+- A submission sent after the deadline day is marked as late (the deadline has no time, so lateness is counted in calendar days).
 - Points are entered on the exercise's scale (10, 20, 40…) and converted to a grade out of 20.
+- Each started day of lateness reduces the grade out of 20 by 10%, up to a maximum of 50%; the grade never goes below 0. For example, 16/20 submitted 3 days late gives 11.2/20.
+- Grades are rounded to one decimal (HALF_UP) with the same result in the API, the transcript and the CSV export.
