@@ -1,74 +1,74 @@
-# Journal IA — Bibliothèque
+# Journal IA — Kilasy
 
-Outil utilisé : [opencode], dans IntelliJ IDEA
+Outil utilisé : opencode, dans IntelliJ IDEA
 
 ## Changement : Pénalité de retard sur les notes (C1)
 
-### échange 1 : 21:50:45
+### Échange 1 — Analyse et plan (21:50)
 
- Demande : " je reprends la maintenance d'un projet nommée kilasy je dois implémenter une fonctionalité l'implementation consiste a concevoir  une pénalité de retard sur les notes −10 % par                                           
-┃  jour de retard entamé, plafond −50 %, note jamais négative exemple ici on a Alice dans l'exrcice tri à bulles deadline 2026-11-10 date et heure de soumissions 2026-11-09T18:00:00                                             
-┃  ducoup grade 16 la note max parce que Alice est à l'heure si elle est en retard 2heures après l'échéance jours entamés = 1 donc sa note max le 16 donnée par le prof par rapport à                                     
-┃  ses resultats sera -10% chaque jour entamés la note attribué sera de -10% pour 3 jours se sera 11.2 ainsi de suite ducoup pour cette grande fonctionalité analyse tous on ne                                           
-┃  touche pas aux codes existant juste l'améliorer selon les besoins des clients donc c'est notre premier fonctionalité avant de tous implementer detail moi sans entrer trop en                                           
-┃  technique ce que tu vas faire les fichier que tu vas modifier pourquoi et tu attend ma confirmation pour l'implementaiton"
-  
-  Réponse de l'agent : « J'ai analysé le projet. Voici mon plan, sans rien modifier pour l'instant.
+**Demande :** "Implémenter la pénalité de retard (-10%/jour, plafond -50%, note ≥ 0). Exemple avec Alice."
 
-Principe retenu : la note du professeur (ex. 16/20) reste stockée telle quelle. La pénalité sera calculée au moment de l'affichage : jours de retard entamés (par date calendaire) × 10 %, limités à 50 %, jamais en dessous de 0. Exemple sur « Tri à bulles » : 09/11 18h → 16,0 ; 11/11 02h → 14,4 ; 13/11 → 11,2 ; 18/11 → 8,0 (plafond).
+**Réponse de l'agent :** Proposition de centraliser le calcul dans une nouvelle classe `GradeCalculator`. Il a expliqué que l'ancienne version calculait la note à 4 endroits avec des arrondis différents (13,7 vs 13,8). Il propose de modifier `SubmissionController`, `GradeReport`, `CsvExport` et `README.md`.
 
-Fichiers concernés :
+**Décision :** Gardé. J'ai validé le plan en confirmant le comptage par jour calendaire, l'application de la pénalité sur la note sur 20, et le refus des tests automatisés (pour ne pas toucher au `pom.xml`).
 
-| Fichier | Pourquoi |
-|---|---|
-| src/main/java/hei/school/GradeCalculator.java (nouveau) | Regrouper la règle en un seul endroit pour que l'API, l'e-mail, le relevé et le CSV affichent exactement la même note. |
-| SubmissionController.java (get et grade) | C'est ici que la note est calculée aujourd'hui, envoyée par e-mail et renvoyée au professeur. |
-| GradeReport.java | Le relevé et la moyenne doivent utiliser la note pénalisée, sinon ils contrediraient l'e-mail. |
-| CsvExport.java | L'export tronque actuellement les notes (13,7 au lieu de 13,8) : je l'aligne sur le même calcul. |
-| README.md | Documenter la nouvelle règle métier. |
+### Échange 2 — Implémentation (22:20)
 
-Non modifiés : base de données, données de démonstration, exercices, étudiants. Les notes déjà saisies seront pénalisées automatiquement, sans migration, et un nouveau correctif ne pénalisera pas deux fois.
+**Demande :** "Ton plan est validé. Passe à l'implémentation. Attention à bien utiliser BigDecimal pour l'arrondi."
 
-Vérification : les données de test contiennent déjà les 4 cas de ton exemple (Alice, Bob, Clara, David) ; je pourrai les contrôler via les endpoints et Mailpit. Si tu veux des tests automatisés, il faudra aussi toucher au pom.xml (dis-moi).
+**Réponse de l'agent :** Implémentation terminée. `GradeCalculator` créé. `SubmissionController`, `GradeReport`, `CsvExport` utilisent ce même calcul. Le bug d'arrondi du CSV est corrigé (13,8 au lieu de 13,7). Vérifications OK via curl.
 
-Points à confirmer : (1) comptage par jour calendaire, car l'échéance n'a pas d'heure stockée ; (2) pénalité appliquée à la note sur 20, pas aux points bruts du professeur ; (3) tests automatisés oui/non.
+**Décision :** Gardé. Vérifications manuelles avec `curl` : 16.0 / 14.4 / 11.2 / 8.0. Relevé et CSV identiques.
 
-Je n'ai rien changé. Confirme-moi et je passe à l'implémentation. »
+## Changement : SMS simulé à la publication d'une note (C2)
 
-### échange 2 : 22:20:47
+### Échange 1 — Analyse et plan (19:40)
 
- Demande : " Comptage par jour calendaire : Oui, c'est validé. On se base sur la date de soumission par rapport à la date de la deadline (sans tenir compte de l'heure de la deadline, puisqu'elle n'est pas stockée). Pénalité sur la note sur 20 : Oui, on applique la pénalité sur la note sur 20 (celle calculée à partir des points), pas sur les points bruts. Tests automatisés : Non, pas besoin de toucher au pom.xml pour l'instant. On fera les vérifications manuellement via curl et Mailpit. Ton plan est validé. Tu peux passer à l'implémentation. Attention sur un point : tu as mentionné que CsvExport.java tronque actuellement les notes (13,7 au lieu de 13,8). Assure-toi que le nouveau GradeCalculator corrige bien ce problème d'arrondi pour que le CSV, le relevé et le grade soient strictement identiques (ex: 14.4 et pas 14.399999). Utilise BigDecimal si nécessaire. vas y "
+**Demande :** "Quand un enseignant publie une note, l'étudiant doit recevoir, en plus de l'e-mail inchangé, un SMS simulé loggé au format `[SMS] +261 34 00 000 00 : Votre note pour « Tri à bulles » est disponible : 14,4/20.`. Contraintes : l'e-mail continue à fonctionner exactement comme avant ; si le SMS échoue, la note reste publiée (mise à jour en base et e-mail non annulés) ; changer de fournisseur plus tard ne doit pas obliger à modifier `SubmissionController` ; pas de réécriture, seuls les fichiers strictement nécessaires. Ne pas coder avant validation, mais consigner l'échange ici."
 
-  Réponse de l'agent : « Implémentation terminée. Nouveau fichier GradeCalculator.java : calcul unique en BigDecimal, jours calendaires entamés, -10 % par jour plafonnés à 50 %, plancher à 0, pénalité appliquée avant un arrondi HALF_UP à une décimale. SubmissionController.java (consultation et notation), GradeReport.java et CsvExport.java utilisent tous ce même calcul : plus de troncature, plus d'artefacts flottants. README.md documente la règle. Aucune modification de la base, des données de démo ni du pom.xml.
+**Réponse de l'IA :** Le code de `grade()` a été relu sans modification : l'e-mail est construit aux lignes 144-154 et envoyé à la ligne 155 par `mailSender.send(message)`. La colonne `phone VARCHAR(20)` existe bien dans `student` (`schema.sql:15`) et est déjà sélectionnée par la requête de correction (`SubmissionController.java:117`).
 
-Vérifications : mvn compile OK. Via curl sur une instance temporaire port 8081 : soumissions 1 à 4 = 16.0 / 14.4 / 11.2 / 8.0 (plafond), Emma = 13.8 ; relevé et CSV identiques (14,4 / 11,2 / 8,0 / 13,8). Notation PUT sur la soumission 7 : 15.3/20 renvoyé, GET identique et e-mail Mailpit conforme ; donnée de démo et e-mail de test supprimés ensuite. Instance temporaire arrêtée, application du port 8080 intacte. »
+**Architecture proposée (5 lignes) :**
+1. Créer une interface `SmsSender` avec une seule méthode `void send(String phone, String message)`.
+2. Créer `LogSmsSender implements SmsSender`, annotée `@Component`, qui affiche `[SMS] <phone> : <message>` avec `System.out.println`.
+3. `SubmissionController` reçoit uniquement `SmsSender` par `@Autowired`, jamais l'implémentation concrète.
+4. Changer de fournisseur revient à ajouter une autre implémentation et à sélectionner le bean (par exemple `@Primary`), sans toucher au contrôleur.
+5. Le contrôleur dépend d'une abstraction : Spring choisit l'implémentation au démarrage, donc le code de notation reste stable.
 
+**Fiabilité :** La mise à jour SQL et le bloc e-mail restent à leur place, inchangés ; l'appel SMS est ajouté juste après l'e-mail, dans un `try` avec `catch (Exception)` qui journalise l'échec. Aucune exception du SMS ne remonte : la note reste en base, l'e-mail est déjà parti et la réponse HTTP est renvoyée normalement. Aucun `@Transactional` n'est ajouté, donc rien ne peut annuler la publication.
 
-Demande : "Comptage par jour calendaire : oui c'est validé  
-on se base sur la date de soumission par rapport a la date de la deadline (sans tenir compte de l'heure de la deadline puisqu'elle n'est pas stockee)
-Penaalitée sur la note sur 20 : oui on applique la pénalité sur la note sur 20 (celle calculée à partir des points) pas sur les points bruts
-Tests automatisés : non pas besoin de toucher au pom.xml pour l'instant je ferais les vérifications manuellement via curl et Mailpit
-Ton plan est validé. Tu peux passer à l'implémentation."
+**Format français :** `grade` est un `BigDecimal` déjà à une décimale ; le message utilise `String.format(Locale.FRANCE, "%.1f", grade)`, ce qui donne `14,4` avec une virgule, puis `Votre note pour « Tri à bulles » est disponible : 14,4/20.`.
 
-### échange 3 : 21:57:04
+**Fichiers concernés :** créer `src/main/java/hei/school/SmsSender.java` et `src/main/java/hei/school/LogSmsSender.java` ; modifier `src/main/java/hei/school/SubmissionController.java` (injection, numéro de téléphone, formatage, appel protégé) et `Journal_IA.md` (le présent échange). Aucune modification du schéma SQL, des données, du `pom.xml`, du `README.md` ni de `GradeCalculator`.
 
- Demande : "est ce qu'il y a des pièges dans se projet des incoherences "
+**Décision :** En attente de validation avant toute modification du code.
 
-  Réponse de l'agent : «
+### Échange 2 — Implémentation (20:04)
 
-Oui, le projet présente plusieurs pièges et incohérences.
+**Demande :** "Plan validé. Passe à l'implémentation. Points d'attention : dans `LogSmsSender`, format exact du log `[SMS] <phone> : <message>` avec `System.out.println` ; dans `SubmissionController`, récupérer le phone depuis la ligne SQL existante (ligne 117) et l'utiliser dans `smsSender.send(phone, messageSms)` ; le `try/catch` doit englober uniquement l'appel SMS, pas l'email ni le `jdbcTemplate.update` ; ne toucher à rien d'autre, pas de `@Transactional`, pas de modif SQL, ni de `pom.xml`. Une fois fait, donne la liste exacte des fichiers, les commandes curl de test nominal et une méthode simple pour simuler une panne SMS puis la retirer. Mets aussi nos échanges dans le journal."
 
-| Piège / incohérence | Justification |
-|---|---|
-| Calcul de la note répété dans 4 entités (détail, correction, relevé, CSV) avec 3 arrondis différents (Math.round, BigDecimal HALF_UP, Math.floor) | Le même devoir pouvait afficher 13,7 dans le CSV et 13,8 dans l'API, ou 14.399999 à cause des doubles. C'est pour cela que, dès le premier prompt, j'ai proposé de centraliser la règle dans GradeCalculator ; solution acceptée. |
-| Deadline enregistrée comme DATE, sans heure | Le retard est compté en jours calendaires : un rendu à 00:01 le lendemain compte 1 jour entamé. Ce n'est pas un bug, c'est la règle que tu as validée. |
-| Fuseaux horaires : LocalDateTime.now() côté Java, now() côté PostgreSQL, colonnes TIMESTAMP sans fuseau | Si la JVM et la base n'ont pas le même fuseau, le comptage peut se décaler d'un jour. Aucun fuseau n'est configuré dans le projet ; non corrigé car hors périmètre. |
-| max_points = 0 présent en base | La validation n'existe qu'à la création d'exercice ; une valeur 0 provoquerait une division par zéro. GradeCalculator renvoie 0 par sécurité. |
-| Schéma idempotent (CREATE TABLE IF NOT EXISTS) | Modifier la définition d'une table existante ne la met pas à jour : il faudrait un ALTER TABLE. C'est une raison de plus de ne pas toucher à la base. |
-| Booléen late calculé à plusieurs endroits (Java et SQL) | Cohérent aujourd'hui avec daysLate > 0, mais dupliqué ; laissé tel quel pour ne pas modifier de code inutile. |
+**Réponse de l'IA :** Fichiers créés : `src/main/java/hei/school/SmsSender.java` (interface avec `void send(String phone, String message)`) et `src/main/java/hei/school/LogSmsSender.java` (`@Component`, log exact `[SMS] +261 34 00 000 02 : Votre note pour « Pile et file » est disponible : 15,3/20.` via `System.out.println`). Fichiers modifiés : `src/main/java/hei/school/SubmissionController.java` (import `Locale`, injection de `SmsSender`, lecture du `phone` déjà présent dans le SELECT de la ligne 117, message français via `String.format(Locale.FRANCE, "%.1f", grade)`, appel SMS dans un `try/catch (Exception)` qui n'entoure que `smsSender.send(phone, messageSms)`) et `Journal_IA.md` (le présent échange). Rien d'autre n'a été touché : ni SQL, ni données, ni `pom.xml`, ni `@Transactional`.
 
-»
+Test nominal (mail + SMS) :
 
+```bash
+docker compose up -d
+mvn spring-boot:run
+curl -s -X PUT http://localhost:8080/submissions/7/grade \
+  -H 'Content-Type: application/json' \
+  -d '{"points":8.5,"feedback":"Test C2"}'
+```
 
+Attendu : HTTP 200, `grade = 15.3`, et dans les logs `Email de note envoyé à bob@etu.kilasy.test` puis `[SMS] +261 34 00 000 02 : Votre note pour « Pile et file » est disponible : 15,3/20.`.
 
+Test de panne SMS : ajouter temporairement dans `LogSmsSender.send` un `if (phone.endsWith("000 06")) throw new RuntimeException("panne SMS simulée");`, recompiler/redémarrer, puis appeler la soumission 12 (téléphone se terminant par `000 06`) :
 
+```bash
+curl -s -X PUT http://localhost:8080/submissions/12/grade \
+  -H 'Content-Type: application/json' \
+  -d '{"points":20,"feedback":"Test panne SMS"}'
+```
+
+Attendu : HTTP 200, e-mail envoyé, log `Échec de l'envoi SMS à +261 34 00 000 06 : panne SMS simulée`, aucune ligne `[SMS]`, et note `10.0` bien enregistrée. La condition temporaire a ensuite été retirée et le projet recompilé.
+
+**Décision :** Gardé. `mvn -o clean compile` OK ; cas nominal et cas de panne vérifiés sur une instance temporaire, conteneurs arrêtés et supprimés. La condition de panne n'est plus présente dans le code final.
